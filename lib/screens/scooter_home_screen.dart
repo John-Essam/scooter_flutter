@@ -6,30 +6,36 @@ class ScooterHomeScreen extends StatelessWidget {
     required this.deviceId,
     required this.batteryPercent,
     required this.isLocked,
+    required this.currentGear,
     required this.onToggleLock,
+    required this.onSetGear,
     required this.onDisconnect,
     this.isUpdatingLock = false,
+    this.isUpdatingGear = false,
   });
 
   final String deviceId;
   final int batteryPercent;
   final bool isLocked;
+  final int currentGear;
   final Future<void> Function(bool locked) onToggleLock;
+  final Future<void> Function(int gear) onSetGear;
   final Future<void> Function() onDisconnect;
   final bool isUpdatingLock;
+  final bool isUpdatingGear;
 
   @override
   Widget build(BuildContext context) {
     final batteryStatus = batteryPercent > 40
         ? 'Normal'
         : batteryPercent > 20
-            ? 'Low'
-            : 'Critical';
+        ? 'Low'
+        : 'Critical';
     final statusColor = batteryPercent > 40
         ? const Color(0xFF0A9F6D)
         : batteryPercent > 20
-            ? const Color(0xFFF5A524)
-            : const Color(0xFFE54B4B);
+        ? const Color(0xFFF5A524)
+        : const Color(0xFFE54B4B);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF2F0EB),
@@ -38,7 +44,10 @@ class ScooterHomeScreen extends StatelessWidget {
         elevation: 0,
         title: const Text(
           'cardoO Scooter X3',
-          style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF003E75)),
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF003E75),
+          ),
         ),
         centerTitle: true,
         actions: [
@@ -79,7 +88,9 @@ class ScooterHomeScreen extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Card(
                   elevation: 2,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                  ),
                   child: Padding(
                     padding: const EdgeInsets.all(12),
                     child: LockSlider(
@@ -91,7 +102,18 @@ class ScooterHomeScreen extends StatelessWidget {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: _PowerGearCard(
+                  currentGear: currentGear,
+                  busy: isUpdatingGear,
+                  onSetGear: onSetGear,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 14,
+                ),
                 child: Text(
                   'Connected device: $deviceId',
                   style: const TextStyle(
@@ -103,6 +125,111 @@ class ScooterHomeScreen extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PowerGearCard extends StatelessWidget {
+  const _PowerGearCard({
+    required this.currentGear,
+    required this.busy,
+    required this.onSetGear,
+  });
+
+  final int currentGear;
+  final bool busy;
+  final Future<void> Function(int gear) onSetGear;
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = currentGear.clamp(0, 3);
+    final labels = <int, String>{0: 'Eco', 1: '1', 2: '2', 3: '3'};
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF4FA3).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.speed,
+                    color: Color(0xFFFF4FA3),
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'Power Gear',
+                    style: TextStyle(
+                      color: Color(0xFF003E75),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+                if (busy)
+                  const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFFF2F5FA),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              padding: const EdgeInsets.all(4),
+              child: Row(
+                children: [0, 1, 2, 3].map((gear) {
+                  final isActive = selected == gear;
+                  return Expanded(
+                    child: GestureDetector(
+                      onTap: busy ? null : () => onSetGear(gear),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 150),
+                        margin: const EdgeInsets.symmetric(horizontal: 2),
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: isActive
+                              ? const Color(0xFF003E75)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(11),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          labels[gear]!,
+                          style: TextStyle(
+                            color: isActive
+                                ? Colors.white
+                                : const Color(0xFF6B7A90),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -128,7 +255,11 @@ class _StatusCard extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
         boxShadow: const [
-          BoxShadow(color: Color(0x22093A66), blurRadius: 20, offset: Offset(0, 8)),
+          BoxShadow(
+            color: Color(0x22093A66),
+            blurRadius: 20,
+            offset: Offset(0, 8),
+          ),
         ],
       ),
       child: Padding(
@@ -153,7 +284,10 @@ class _StatusCard extends StatelessWidget {
                 _BatteryIcon(level: batteryPercent, color: statusColor),
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(999),
@@ -264,12 +398,19 @@ class LockSlider extends StatefulWidget {
 
 class _LockSliderState extends State<LockSlider> {
   double? _dragPosition;
+  double? _dragStartX;
 
   @override
   void didUpdateWidget(covariant LockSlider oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!widget.busy && oldWidget.locked != widget.locked) {
       _dragPosition = null;
+      _dragStartX = null;
+    } else if (!widget.busy &&
+        oldWidget.busy &&
+        oldWidget.locked == widget.locked) {
+      _dragPosition = null;
+      _dragStartX = null;
     }
   }
 
@@ -308,25 +449,49 @@ class _LockSliderState extends State<LockSlider> {
                 left: currentX,
                 top: 5,
                 child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onHorizontalDragStart: widget.busy
+                      ? null
+                      : (_) {
+                          setState(() {
+                            _dragStartX = currentX;
+                            _dragPosition = currentX;
+                          });
+                        },
                   onHorizontalDragUpdate: widget.busy
                       ? null
                       : (details) {
                           setState(() {
-                            _dragPosition = (currentX + details.delta.dx)
+                            final base = _dragPosition ?? _dragStartX ?? origin;
+                            _dragPosition = (base + details.delta.dx)
                                 .clamp(0.0, maxX)
                                 .toDouble();
+                          });
+                        },
+                  onHorizontalDragCancel: widget.busy
+                      ? null
+                      : () {
+                          setState(() {
+                            _dragStartX = null;
+                            _dragPosition = null;
                           });
                         },
                   onHorizontalDragEnd: widget.busy
                       ? null
                       : (_) async {
-                          final x = _dragPosition ?? origin;
-                          final shouldUnlock = widget.locked && x > (maxX * 0.65);
-                          final shouldLock = !widget.locked && x < (maxX * 0.35);
+                          final x = (_dragPosition ?? origin)
+                              .clamp(0.0, maxX)
+                              .toDouble();
+                          final shouldUnlock =
+                              widget.locked && x > (maxX * 0.65);
+                          final shouldLock =
+                              !widget.locked && x < (maxX * 0.35);
                           final shouldToggle = shouldUnlock || shouldLock;
+                          final targetX = widget.locked ? maxX : 0.0;
 
                           setState(() {
-                            _dragPosition = null;
+                            _dragStartX = null;
+                            _dragPosition = shouldToggle ? targetX : null;
                           });
 
                           if (shouldToggle) {
@@ -341,7 +506,11 @@ class _LockSliderState extends State<LockSlider> {
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(26),
                       boxShadow: const [
-                        BoxShadow(color: Color(0x44000000), blurRadius: 8, offset: Offset(0, 3)),
+                        BoxShadow(
+                          color: Color(0x44000000),
+                          blurRadius: 8,
+                          offset: Offset(0, 3),
+                        ),
                       ],
                     ),
                     child: Icon(
