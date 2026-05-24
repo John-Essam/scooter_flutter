@@ -59,6 +59,15 @@ class ScooterBridgeClient {
     timeoutMs: timeoutMs,
     payload: {'enabled': enabled},
   );
+  Future<BridgeResponse> setStartMode({
+    required bool enabled,
+    int? timeoutMs,
+  }) => _invoke(
+    _control,
+    'setStartMode',
+    timeoutMs: timeoutMs,
+    payload: {'enabled': enabled},
+  );
   Future<BridgeResponse> setGear({required int gear, int? timeoutMs}) => _invoke(
     _control,
     'setGear',

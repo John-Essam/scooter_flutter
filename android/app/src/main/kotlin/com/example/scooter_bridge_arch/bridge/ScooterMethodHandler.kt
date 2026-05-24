@@ -124,6 +124,16 @@ internal class ScooterMethodHandler(
                     )
                 native.setCruiseControl(enabled)
             }
+            "setStartMode" -> {
+                val enabled = payload["enabled"] as? Boolean
+                    ?: throw BridgeNativeException(
+                        code = ErrorCodes.INVALID_ARGUMENT,
+                        message = "payload.enabled is required",
+                        retriable = false,
+                        details = null,
+                    )
+                native.setStartMode(enabled)
+            }
             "setGear" -> {
                 val gear = when (val value = payload["gear"]) {
                     is Int -> value

@@ -176,6 +176,11 @@ internal class RealAndroidBleBridge(
         return mapOf("cruiseControl" to enabled)
     }
 
+    fun setStartMode(enabled: Boolean): Map<String, Any?> {
+        connection.send(Tcb02Commands.startMode(enabled))
+        return mapOf("startMode" to enabled)
+    }
+
     suspend fun setGear(gear: Int, timeoutMs: Long): Map<String, Any?> {
         val resolved = when (gear) {
             0 -> ScooterGear.ZERO
