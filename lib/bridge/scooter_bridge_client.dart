@@ -38,6 +38,8 @@ class ScooterBridgeClient {
       );
   Future<BridgeResponse> bind({int? timeoutMs}) =>
       _invoke(_connection, 'bind', timeoutMs: timeoutMs);
+  Future<BridgeResponse> unbind({int? timeoutMs}) =>
+      _invoke(_connection, 'unbind', timeoutMs: timeoutMs);
   Future<BridgeResponse> disconnect({int? timeoutMs}) =>
       _invoke(_connection, 'disconnect', timeoutMs: timeoutMs);
 

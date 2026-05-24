@@ -89,6 +89,7 @@ internal class ScooterMethodHandler(
                 native.connect(deviceId, timeoutMs)
             }
             "bind" -> native.bind()
+            "unbind" -> native.unbind()
             "disconnect" -> native.disconnect()
             else -> return unsupported(requestId, method)
         }

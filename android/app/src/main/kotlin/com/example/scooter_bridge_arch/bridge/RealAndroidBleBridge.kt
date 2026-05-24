@@ -147,6 +147,12 @@ internal class RealAndroidBleBridge(
         return mapOf("bound" to true)
     }
 
+    fun unbind(): Map<String, Any?> {
+        emitLog("connection", "unbind requested")
+        connection.send(Tcb02Commands.readUnbind())
+        return mapOf("bound" to false)
+    }
+
     suspend fun setLock(locked: Boolean, timeoutMs: Long): Map<String, Any?> {
         val deferred = CompletableDeferred<Boolean>()
         lockDeferred = deferred
