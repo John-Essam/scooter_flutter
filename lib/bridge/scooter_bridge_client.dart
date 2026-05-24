@@ -102,6 +102,15 @@ class ScooterBridgeClient {
     'readNfcStatus',
     timeoutMs: timeoutMs,
   );
+  Future<BridgeResponse> setNfcEnabled({
+    required bool enabled,
+    int? timeoutMs,
+  }) => _invoke(
+    _control,
+    'setNfcEnabled',
+    timeoutMs: timeoutMs,
+    payload: {'enabled': enabled},
+  );
   Future<BridgeResponse> setGear({required int gear, int? timeoutMs}) => _invoke(
     _control,
     'setGear',
