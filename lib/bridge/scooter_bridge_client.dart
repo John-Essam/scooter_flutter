@@ -182,6 +182,15 @@ class ScooterBridgeClient {
     'factoryReset',
     timeoutMs: timeoutMs,
   );
+  Future<BridgeResponse> readGearMaxSpeed({
+    required int gear,
+    int? timeoutMs,
+  }) => _invoke(
+    _control,
+    'readGearMaxSpeed',
+    timeoutMs: timeoutMs,
+    payload: {'gear': gear},
+  );
   Future<BridgeResponse> setAmbientLight({
     required bool on,
     int? timeoutMs,

@@ -75,6 +75,8 @@ internal class RealAndroidBleBridge(
     private var deviceInfoDeferred: CompletableDeferred<String>? = null
     private var meterVersionDeferred: CompletableDeferred<Map<String, String>>? = null
     private var controllerVersionDeferred: CompletableDeferred<Map<String, String>>? = null
+    private var gearMaxSpeedDeferred: CompletableDeferred<Int>? = null
+    private var expectedGearMaxSpeedGear: Int? = null
     private var connectedDeviceId: String? = null
     private var lastScanFingerprint: String? = null
     private var lastHeartbeatRxLogMs: Long = 0L
@@ -204,6 +206,9 @@ internal class RealAndroidBleBridge(
         meterVersionDeferred = null
         controllerVersionDeferred?.cancel()
         controllerVersionDeferred = null
+        gearMaxSpeedDeferred?.cancel()
+        gearMaxSpeedDeferred = null
+        expectedGearMaxSpeedGear = null
         return mapOf("state" to "idle")
     }
 
@@ -357,6 +362,39 @@ internal class RealAndroidBleBridge(
             )
         )
         return mapOf("factoryResetRequested" to true)
+    }
+
+    suspend fun readGearMaxSpeed(gear: Int, timeoutMs: Long): Map<String, Any?> {
+        val resolved = when (gear) {
+            0 -> ScooterGear.ZERO
+            1 -> ScooterGear.ONE
+            2 -> ScooterGear.TWO
+            3 -> ScooterGear.THREE
+            else -> throw BridgeNativeException(
+                code = ErrorCodes.INVALID_ARGUMENT,
+                message = "payload.gear must be 0..3",
+                retriable = false,
+                details = mapOf("gear" to gear),
+            )
+        }
+        val deferred = CompletableDeferred<Int>()
+        gearMaxSpeedDeferred?.cancel()
+        gearMaxSpeedDeferred = deferred
+        expectedGearMaxSpeedGear = gear
+        emitLog("control", "readGearMaxSpeed requested gear=$gear timeoutMs=$timeoutMs")
+        connection.send(Tcb05Commands.readGearMaxSpeed(resolved))
+
+        val matched = withTimeoutOrNull(timeoutMs) { deferred.await() }
+            ?: throw BridgeNativeException(
+                code = ErrorCodes.TIMEOUT,
+                message = "Gear max speed read timeout",
+                retriable = true,
+                details = mapOf("gear" to gear, "timeoutMs" to timeoutMs),
+            )
+        return mapOf(
+            "gear" to gear,
+            "maxSpeedKmh" to matched,
+        )
     }
 
     suspend fun setAmbientLight(on: Boolean, timeoutMs: Long): Map<String, Any?> {
@@ -920,6 +958,18 @@ internal class RealAndroidBleBridge(
                     )
                 }
                 controllerVersionDeferred = null
+                if (gearMaxSpeedDeferred?.isCompleted == false) {
+                    gearMaxSpeedDeferred?.completeExceptionally(
+                        BridgeNativeException(
+                            code = ErrorCodes.BLE_DISCONNECTED,
+                            message = "Disconnected while waiting gear max speed read",
+                            retriable = true,
+                            details = null,
+                        )
+                    )
+                }
+                gearMaxSpeedDeferred = null
+                expectedGearMaxSpeedGear = null
                 pendingConnectMac = null
             }
             BleState.Scanning -> emitConnection("scanning", reason = null, retriable = false, device = null)
@@ -1121,6 +1171,27 @@ internal class RealAndroidBleBridge(
                 emitTelemetry("controllerVersion", version)
                 controllerVersionDeferred?.complete(version)
                 controllerVersionDeferred = null
+            }
+            is TcbResponse.GearMaxSpeedUpdate -> {
+                val gear = when (parsed.gear) {
+                    ScooterGear.ZERO -> 0
+                    ScooterGear.ONE -> 1
+                    ScooterGear.TWO -> 2
+                    ScooterGear.THREE -> 3
+                }
+                emitTelemetry(
+                    "gearMaxSpeed",
+                    mapOf(
+                        "gear" to gear,
+                        "maxSpeedKmh" to parsed.maxSpeed,
+                    )
+                )
+                val expected = expectedGearMaxSpeedGear
+                if (expected != null && expected == gear) {
+                    gearMaxSpeedDeferred?.complete(parsed.maxSpeed)
+                    gearMaxSpeedDeferred = null
+                    expectedGearMaxSpeedGear = null
+                }
             }
             null -> Unit
             else -> {

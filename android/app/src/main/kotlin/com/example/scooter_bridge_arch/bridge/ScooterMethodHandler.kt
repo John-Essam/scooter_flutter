@@ -265,6 +265,20 @@ internal class ScooterMethodHandler(
                 native.setAmbientRgb(mode, red, green, blue, brightness)
             }
             "setRainbowMode" -> native.setRainbowMode()
+            "readGearMaxSpeed" -> {
+                val gear = when (val value = payload["gear"]) {
+                    is Int -> value
+                    is Long -> value.toInt()
+                    is Double -> value.toInt()
+                    else -> throw BridgeNativeException(
+                        code = ErrorCodes.INVALID_ARGUMENT,
+                        message = "payload.gear is required",
+                        retriable = false,
+                        details = null,
+                    )
+                }
+                native.readGearMaxSpeed(gear, timeoutMs)
+            }
             "setGear" -> {
                 val gear = when (val value = payload["gear"]) {
                     is Int -> value
