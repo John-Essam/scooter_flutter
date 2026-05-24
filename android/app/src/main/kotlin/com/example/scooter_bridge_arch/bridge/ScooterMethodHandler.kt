@@ -182,6 +182,16 @@ internal class ScooterMethodHandler(
                     )
                 native.setNfcEnabled(enabled, timeoutMs)
             }
+            "setAmbientLight" -> {
+                val on = payload["on"] as? Boolean
+                    ?: throw BridgeNativeException(
+                        code = ErrorCodes.INVALID_ARGUMENT,
+                        message = "payload.on is required",
+                        retriable = false,
+                        details = null,
+                    )
+                native.setAmbientLight(on, timeoutMs)
+            }
             "setGear" -> {
                 val gear = when (val value = payload["gear"]) {
                     is Int -> value

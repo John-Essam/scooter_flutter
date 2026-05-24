@@ -49,6 +49,8 @@ internal class RealAndroidBleBridge(
     private var brakeResponseDeferred: CompletableDeferred<Int>? = null
     private var nfcStatusDeferred: CompletableDeferred<Boolean>? = null
     private var expectedNfcStatus: Boolean? = null
+    private var ambientLightDeferred: CompletableDeferred<Boolean>? = null
+    private var expectedAmbientLight: Boolean? = null
     private var connectedDeviceId: String? = null
     private var lastScanFingerprint: String? = null
     private var lastHeartbeatRxLogMs: Long = 0L
@@ -154,6 +156,9 @@ internal class RealAndroidBleBridge(
         nfcStatusDeferred?.cancel()
         nfcStatusDeferred = null
         expectedNfcStatus = null
+        ambientLightDeferred?.cancel()
+        ambientLightDeferred = null
+        expectedAmbientLight = null
         return mapOf("state" to "idle")
     }
 
@@ -297,6 +302,24 @@ internal class RealAndroidBleBridge(
         return mapOf("nfcEnabled" to matched)
     }
 
+    suspend fun setAmbientLight(on: Boolean, timeoutMs: Long): Map<String, Any?> {
+        val deferred = CompletableDeferred<Boolean>()
+        ambientLightDeferred?.cancel()
+        ambientLightDeferred = deferred
+        expectedAmbientLight = on
+        emitLog("control", "setAmbientLight requested on=$on timeoutMs=$timeoutMs")
+        connection.send(Tcb04Commands.writeAmbientLight(on))
+
+        val matched = withTimeoutOrNull(timeoutMs) { deferred.await() }
+            ?: throw BridgeNativeException(
+                code = ErrorCodes.TIMEOUT,
+                message = "Ambient light write timeout waiting status confirmation",
+                retriable = true,
+                details = mapOf("on" to on, "timeoutMs" to timeoutMs),
+            )
+        return mapOf("ambientOn" to matched)
+    }
+
     suspend fun setGear(gear: Int, timeoutMs: Long): Map<String, Any?> {
         val resolved = when (gear) {
             0 -> ScooterGear.ZERO
@@ -433,6 +456,18 @@ internal class RealAndroidBleBridge(
                 }
                 nfcStatusDeferred = null
                 expectedNfcStatus = null
+                if (ambientLightDeferred?.isCompleted == false) {
+                    ambientLightDeferred?.completeExceptionally(
+                        BridgeNativeException(
+                            code = ErrorCodes.BLE_DISCONNECTED,
+                            message = "Disconnected while waiting ambient light confirmation",
+                            retriable = true,
+                            details = null,
+                        )
+                    )
+                }
+                ambientLightDeferred = null
+                expectedAmbientLight = null
                 pendingConnectMac = null
             }
             BleState.Scanning -> emitConnection("scanning", reason = null, retriable = false, device = null)
@@ -529,6 +564,15 @@ internal class RealAndroidBleBridge(
                     expectedNfcStatus = null
                 }
                 emitTelemetry("nfc", mapOf("enabled" to parsed.enabled))
+            }
+            is TcbResponse.LightUpdate -> {
+                val expected = expectedAmbientLight
+                if (expected == null || expected == parsed.value.ambientOn) {
+                    ambientLightDeferred?.complete(parsed.value.ambientOn)
+                    ambientLightDeferred = null
+                    expectedAmbientLight = null
+                }
+                emitTelemetry("light", mapOf("ambientOn" to parsed.value.ambientOn))
             }
             null -> Unit
             else -> {
