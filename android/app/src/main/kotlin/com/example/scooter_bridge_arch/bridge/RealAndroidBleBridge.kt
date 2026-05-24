@@ -15,6 +15,7 @@ import com.example.scooter_android_demo.commands.Tcb08Commands
 import com.example.scooter_android_demo.commands.Tcb09Commands
 import com.example.scooter_android_demo.commands.Tcb0ACommands
 import com.example.scooter_android_demo.commands.Tcb0BCommands
+import com.example.scooter_android_demo.commands.Tcb11Commands
 import com.example.scooter_android_demo.commands.Tcb1ACommands
 import com.example.scooter_android_demo.commands.Tcb22Commands
 import com.example.scooter_android_demo.commands.Tcb30Commands
@@ -71,6 +72,8 @@ internal class RealAndroidBleBridge(
     private var speedStatsDeferred: CompletableDeferred<Pair<Float, Float>>? = null
     private var serialNumberDeferred: CompletableDeferred<String>? = null
     private var deviceInfoDeferred: CompletableDeferred<String>? = null
+    private var meterVersionDeferred: CompletableDeferred<Map<String, String>>? = null
+    private var controllerVersionDeferred: CompletableDeferred<Map<String, String>>? = null
     private var connectedDeviceId: String? = null
     private var lastScanFingerprint: String? = null
     private var lastHeartbeatRxLogMs: Long = 0L
@@ -196,6 +199,10 @@ internal class RealAndroidBleBridge(
         serialNumberDeferred = null
         deviceInfoDeferred?.cancel()
         deviceInfoDeferred = null
+        meterVersionDeferred?.cancel()
+        meterVersionDeferred = null
+        controllerVersionDeferred?.cancel()
+        controllerVersionDeferred = null
         return mapOf("state" to "idle")
     }
 
@@ -607,6 +614,40 @@ internal class RealAndroidBleBridge(
         return mapOf("deviceInfo" to matched)
     }
 
+    suspend fun readMeterVersion(timeoutMs: Long): Map<String, Any?> {
+        val deferred = CompletableDeferred<Map<String, String>>()
+        meterVersionDeferred?.cancel()
+        meterVersionDeferred = deferred
+        emitLog("control", "readMeterVersion requested timeoutMs=$timeoutMs")
+        connection.send(Tcb11Commands.readMeterVersion())
+
+        val matched = withTimeoutOrNull(timeoutMs) { deferred.await() }
+            ?: throw BridgeNativeException(
+                code = ErrorCodes.TIMEOUT,
+                message = "Meter version read timeout",
+                retriable = true,
+                details = mapOf("timeoutMs" to timeoutMs),
+            )
+        return mapOf("meterVersion" to matched)
+    }
+
+    suspend fun readControllerVersion(timeoutMs: Long): Map<String, Any?> {
+        val deferred = CompletableDeferred<Map<String, String>>()
+        controllerVersionDeferred?.cancel()
+        controllerVersionDeferred = deferred
+        emitLog("control", "readControllerVersion requested timeoutMs=$timeoutMs")
+        connection.send(Tcb11Commands.readControllerVersion())
+
+        val matched = withTimeoutOrNull(timeoutMs) { deferred.await() }
+            ?: throw BridgeNativeException(
+                code = ErrorCodes.TIMEOUT,
+                message = "Controller version read timeout",
+                retriable = true,
+                details = mapOf("timeoutMs" to timeoutMs),
+            )
+        return mapOf("controllerVersion" to matched)
+    }
+
     suspend fun setGear(gear: Int, timeoutMs: Long): Map<String, Any?> {
         val resolved = when (gear) {
             0 -> ScooterGear.ZERO
@@ -844,6 +885,28 @@ internal class RealAndroidBleBridge(
                     )
                 }
                 deviceInfoDeferred = null
+                if (meterVersionDeferred?.isCompleted == false) {
+                    meterVersionDeferred?.completeExceptionally(
+                        BridgeNativeException(
+                            code = ErrorCodes.BLE_DISCONNECTED,
+                            message = "Disconnected while waiting meter version read",
+                            retriable = true,
+                            details = null,
+                        )
+                    )
+                }
+                meterVersionDeferred = null
+                if (controllerVersionDeferred?.isCompleted == false) {
+                    controllerVersionDeferred?.completeExceptionally(
+                        BridgeNativeException(
+                            code = ErrorCodes.BLE_DISCONNECTED,
+                            message = "Disconnected while waiting controller version read",
+                            retriable = true,
+                            details = null,
+                        )
+                    )
+                }
+                controllerVersionDeferred = null
                 pendingConnectMac = null
             }
             BleState.Scanning -> emitConnection("scanning", reason = null, retriable = false, device = null)
@@ -1025,6 +1088,26 @@ internal class RealAndroidBleBridge(
                 emitTelemetry("deviceInfo", mapOf("deviceInfo" to parsed.info))
                 deviceInfoDeferred?.complete(parsed.info)
                 deviceInfoDeferred = null
+            }
+            is TcbResponse.MeterVersionUpdate -> {
+                val version = mapOf(
+                    "manufacturerCode" to parsed.value.manufacturerCode,
+                    "hardwareVersion" to parsed.value.hardwareVersion,
+                    "binVersion" to parsed.value.binVersion,
+                )
+                emitTelemetry("meterVersion", version)
+                meterVersionDeferred?.complete(version)
+                meterVersionDeferred = null
+            }
+            is TcbResponse.ControllerVersionUpdate -> {
+                val version = mapOf(
+                    "manufacturerCode" to parsed.value.manufacturerCode,
+                    "hardwareVersion" to parsed.value.hardwareVersion,
+                    "binVersion" to parsed.value.binVersion,
+                )
+                emitTelemetry("controllerVersion", version)
+                controllerVersionDeferred?.complete(version)
+                controllerVersionDeferred = null
             }
             null -> Unit
             else -> {
