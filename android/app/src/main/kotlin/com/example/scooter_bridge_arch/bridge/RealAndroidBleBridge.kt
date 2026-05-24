@@ -16,6 +16,8 @@ import com.example.scooter_android_demo.model.enums.ScooterGear
 import com.example.scooter_android_demo.model.enums.DeviceModel
 import com.example.scooter_android_demo.protocol.TcbResponse
 import com.example.scooter_android_demo.protocol.TcbResponseParser
+import com.example.tcblecomminucation.TCBConstant.TCBResponseType
+import com.example.tcblecomminucation.cmd.TCB22CMD
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -225,6 +227,31 @@ internal class RealAndroidBleBridge(
                 details = mapOf("timeoutMs" to timeoutMs),
             )
         return mapOf("brakeResponse" to matched)
+    }
+
+    fun setThrottleBrakeResponse(throttle: Int, brake: Int): Map<String, Any?> {
+        if (throttle !in 0..10) {
+            throw BridgeNativeException(
+                code = ErrorCodes.INVALID_ARGUMENT,
+                message = "payload.throttle must be 0..10",
+                retriable = false,
+                details = mapOf("throttle" to throttle),
+            )
+        }
+        if (brake !in 0..10) {
+            throw BridgeNativeException(
+                code = ErrorCodes.INVALID_ARGUMENT,
+                message = "payload.brake must be 0..10",
+                retriable = false,
+                details = mapOf("brake" to brake),
+            )
+        }
+        connection.send(TCB22CMD.writeResponseTime(TCBResponseType.throttleResponse, throttle))
+        connection.send(TCB22CMD.writeResponseTime(TCBResponseType.brakeResponse, brake))
+        return mapOf(
+            "throttleResponse" to throttle,
+            "brakeResponse" to brake,
+        )
     }
 
     suspend fun setGear(gear: Int, timeoutMs: Long): Map<String, Any?> {

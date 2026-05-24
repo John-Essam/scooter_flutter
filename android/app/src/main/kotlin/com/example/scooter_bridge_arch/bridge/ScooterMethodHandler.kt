@@ -146,6 +146,31 @@ internal class ScooterMethodHandler(
             }
             "readThrottleResponse" -> native.readThrottleResponse(timeoutMs)
             "readBrakeResponse" -> native.readBrakeResponse(timeoutMs)
+            "setThrottleBrakeResponse" -> {
+                val throttle = when (val value = payload["throttle"]) {
+                    is Int -> value
+                    is Long -> value.toInt()
+                    is Double -> value.toInt()
+                    else -> throw BridgeNativeException(
+                        code = ErrorCodes.INVALID_ARGUMENT,
+                        message = "payload.throttle is required",
+                        retriable = false,
+                        details = null,
+                    )
+                }
+                val brake = when (val value = payload["brake"]) {
+                    is Int -> value
+                    is Long -> value.toInt()
+                    is Double -> value.toInt()
+                    else -> throw BridgeNativeException(
+                        code = ErrorCodes.INVALID_ARGUMENT,
+                        message = "payload.brake is required",
+                        retriable = false,
+                        details = null,
+                    )
+                }
+                native.setThrottleBrakeResponse(throttle, brake)
+            }
             "setGear" -> {
                 val gear = when (val value = payload["gear"]) {
                     is Int -> value
