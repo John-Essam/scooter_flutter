@@ -1,206 +1,117 @@
 import 'package:flutter/services.dart';
 
-import 'bridge_error.dart';
-import 'bridge_response.dart';
-import 'channel_names.dart';
-
 class ScooterBridgeClient {
   ScooterBridgeClient();
 
-  final MethodChannel _connection = const MethodChannel(
-    ScooterChannels.connectionMethod,
-  );
-  final MethodChannel _control = const MethodChannel(ScooterChannels.controlMethod);
+  static const String _methodChannelName = 'scooter/bridge';
+  final MethodChannel _bridge = const MethodChannel(_methodChannelName);
 
-  final EventChannel _telemetry = const EventChannel(ScooterChannels.telemetryEvent);
-  final EventChannel _connectionState = const EventChannel(
-    ScooterChannels.connectionStateEvent,
-  );
-  final EventChannel _logs = const EventChannel(ScooterChannels.logsEvent);
+  Future<Map<String, dynamic>> startScan({int? timeoutMs}) =>
+      _invoke('startScan', timeoutMs: timeoutMs);
+  Future<Map<String, dynamic>> stopScan({int? timeoutMs}) =>
+      _invoke('stopScan', timeoutMs: timeoutMs);
+  Future<Map<String, dynamic>> connect({
+    required String deviceId,
+    int? timeoutMs,
+  }) =>
+      _invoke('connect', timeoutMs: timeoutMs, payload: {'deviceId': deviceId});
+  Future<Map<String, dynamic>> bind({int? timeoutMs}) =>
+      _invoke('bind', timeoutMs: timeoutMs);
+  Future<Map<String, dynamic>> unbind({int? timeoutMs}) =>
+      _invoke('unbind', timeoutMs: timeoutMs);
+  Future<Map<String, dynamic>> disconnect({int? timeoutMs}) =>
+      _invoke('disconnect', timeoutMs: timeoutMs);
 
-  int _reqCounter = 0;
-
-  Stream<Map<String, dynamic>> telemetryStream() => _mapEvent(_telemetry);
-  Stream<Map<String, dynamic>> faultFlagsStream() => telemetryStream()
-      .where((event) => _faultDataFromEvent(event) != null)
-      .map((event) => _faultDataFromEvent(event)!);
-  Stream<Map<String, dynamic>> operationalStatusStream() => telemetryStream()
-      .where((event) => _operationalDataFromEvent(event) != null)
-      .map((event) => _operationalDataFromEvent(event)!);
-  Stream<Map<String, dynamic>> connectionStateStream() =>
-      _mapEvent(_connectionState);
-  Stream<Map<String, dynamic>> logsStream() => _mapEvent(_logs);
-
-  Future<BridgeResponse> startScan({int? timeoutMs}) =>
-      _invoke(_connection, 'startScan', timeoutMs: timeoutMs);
-  Future<BridgeResponse> stopScan({int? timeoutMs}) =>
-      _invoke(_connection, 'stopScan', timeoutMs: timeoutMs);
-  Future<BridgeResponse> connect({required String deviceId, int? timeoutMs}) =>
-      _invoke(
-        _connection,
-        'connect',
-        timeoutMs: timeoutMs,
-        payload: {'deviceId': deviceId},
-      );
-  Future<BridgeResponse> bind({int? timeoutMs}) =>
-      _invoke(_connection, 'bind', timeoutMs: timeoutMs);
-  Future<BridgeResponse> unbind({int? timeoutMs}) =>
-      _invoke(_connection, 'unbind', timeoutMs: timeoutMs);
-  Future<BridgeResponse> disconnect({int? timeoutMs}) =>
-      _invoke(_connection, 'disconnect', timeoutMs: timeoutMs);
-
-  Future<BridgeResponse> setLock({required bool locked, int? timeoutMs}) =>
-      _invoke(
-        _control,
-        'setLock',
-        timeoutMs: timeoutMs,
-        payload: {'locked': locked},
-      );
-  Future<BridgeResponse> setCruiseControl({
+  Future<Map<String, dynamic>> setLock({
+    required bool locked,
+    int? timeoutMs,
+  }) => _invoke('setLock', timeoutMs: timeoutMs, payload: {'locked': locked});
+  Future<Map<String, dynamic>> setCruiseControl({
     required bool enabled,
     int? timeoutMs,
   }) => _invoke(
-    _control,
     'setCruiseControl',
     timeoutMs: timeoutMs,
     payload: {'enabled': enabled},
   );
-  Future<BridgeResponse> setStartMode({
+  Future<Map<String, dynamic>> setStartMode({
     required bool enabled,
     int? timeoutMs,
   }) => _invoke(
-    _control,
     'setStartMode',
     timeoutMs: timeoutMs,
     payload: {'enabled': enabled},
   );
-  Future<BridgeResponse> setUnitSystem({
+  Future<Map<String, dynamic>> setUnitSystem({
     required bool metric,
     int? timeoutMs,
   }) => _invoke(
-    _control,
     'setUnitSystem',
     timeoutMs: timeoutMs,
     payload: {'metric': metric},
   );
-  Future<BridgeResponse> readThrottleResponse({int? timeoutMs}) => _invoke(
-    _control,
-    'readThrottleResponse',
-    timeoutMs: timeoutMs,
-  );
-  Future<BridgeResponse> readBrakeResponse({int? timeoutMs}) => _invoke(
-    _control,
-    'readBrakeResponse',
-    timeoutMs: timeoutMs,
-  );
-  Future<BridgeResponse> readControllerTemperature({int? timeoutMs}) => _invoke(
-    _control,
-    'readControllerTemperature',
-    timeoutMs: timeoutMs,
-  );
-  Future<BridgeResponse> readBatteryTemperature({int? timeoutMs}) => _invoke(
-    _control,
-    'readBatteryTemperature',
-    timeoutMs: timeoutMs,
-  );
-  Future<BridgeResponse> readMotorTemperature({int? timeoutMs}) => _invoke(
-    _control,
-    'readMotorTemperature',
-    timeoutMs: timeoutMs,
-  );
-  Future<BridgeResponse> readDrivingCurrent({int? timeoutMs}) => _invoke(
-    _control,
-    'readDrivingCurrent',
-    timeoutMs: timeoutMs,
-  );
-  Future<BridgeResponse> readRemainingMileage({int? timeoutMs}) => _invoke(
-    _control,
-    'readRemainingMileage',
-    timeoutMs: timeoutMs,
-  );
-  Future<BridgeResponse> readTripMileage({int? timeoutMs}) => _invoke(
-    _control,
-    'readTripMileage',
-    timeoutMs: timeoutMs,
-  );
-  Future<BridgeResponse> readOdo({int? timeoutMs}) => _invoke(
-    _control,
-    'readOdo',
-    timeoutMs: timeoutMs,
-  );
-  Future<BridgeResponse> readSpeedStats({int? timeoutMs}) => _invoke(
-    _control,
-    'readSpeedStats',
-    timeoutMs: timeoutMs,
-  );
-  Future<BridgeResponse> readSerialNumber({int? timeoutMs}) => _invoke(
-    _control,
-    'readSerialNumber',
-    timeoutMs: timeoutMs,
-  );
-  Future<BridgeResponse> readDeviceInfo({int? timeoutMs}) => _invoke(
-    _control,
-    'readDeviceInfo',
-    timeoutMs: timeoutMs,
-  );
-  Future<BridgeResponse> readMeterVersion({int? timeoutMs}) => _invoke(
-    _control,
-    'readMeterVersion',
-    timeoutMs: timeoutMs,
-  );
-  Future<BridgeResponse> readControllerVersion({int? timeoutMs}) => _invoke(
-    _control,
-    'readControllerVersion',
-    timeoutMs: timeoutMs,
-  );
-  Future<BridgeResponse> setThrottleBrakeResponse({
+  Future<Map<String, dynamic>> readThrottleResponse({int? timeoutMs}) =>
+      _invoke('readThrottleResponse', timeoutMs: timeoutMs);
+  Future<Map<String, dynamic>> readBrakeResponse({int? timeoutMs}) =>
+      _invoke('readBrakeResponse', timeoutMs: timeoutMs);
+  Future<Map<String, dynamic>> readControllerTemperature({int? timeoutMs}) =>
+      _invoke('readControllerTemperature', timeoutMs: timeoutMs);
+  Future<Map<String, dynamic>> readBatteryTemperature({int? timeoutMs}) =>
+      _invoke('readBatteryTemperature', timeoutMs: timeoutMs);
+  Future<Map<String, dynamic>> readMotorTemperature({int? timeoutMs}) =>
+      _invoke('readMotorTemperature', timeoutMs: timeoutMs);
+  Future<Map<String, dynamic>> readDrivingCurrent({int? timeoutMs}) =>
+      _invoke('readDrivingCurrent', timeoutMs: timeoutMs);
+  Future<Map<String, dynamic>> readRemainingMileage({int? timeoutMs}) =>
+      _invoke('readRemainingMileage', timeoutMs: timeoutMs);
+  Future<Map<String, dynamic>> readTripMileage({int? timeoutMs}) =>
+      _invoke('readTripMileage', timeoutMs: timeoutMs);
+  Future<Map<String, dynamic>> readOdo({int? timeoutMs}) =>
+      _invoke('readOdo', timeoutMs: timeoutMs);
+  Future<Map<String, dynamic>> readSpeedStats({int? timeoutMs}) =>
+      _invoke('readSpeedStats', timeoutMs: timeoutMs);
+  Future<Map<String, dynamic>> readSerialNumber({int? timeoutMs}) =>
+      _invoke('readSerialNumber', timeoutMs: timeoutMs);
+  Future<Map<String, dynamic>> readDeviceInfo({int? timeoutMs}) =>
+      _invoke('readDeviceInfo', timeoutMs: timeoutMs);
+  Future<Map<String, dynamic>> readMeterVersion({int? timeoutMs}) =>
+      _invoke('readMeterVersion', timeoutMs: timeoutMs);
+  Future<Map<String, dynamic>> readControllerVersion({int? timeoutMs}) =>
+      _invoke('readControllerVersion', timeoutMs: timeoutMs);
+  Future<Map<String, dynamic>> setThrottleBrakeResponse({
     required int throttle,
     required int brake,
     int? timeoutMs,
   }) => _invoke(
-    _control,
     'setThrottleBrakeResponse',
     timeoutMs: timeoutMs,
     payload: {'throttle': throttle, 'brake': brake},
   );
-  Future<BridgeResponse> readNfcStatus({int? timeoutMs}) => _invoke(
-    _control,
-    'readNfcStatus',
-    timeoutMs: timeoutMs,
-  );
-  Future<BridgeResponse> setNfcEnabled({
+  Future<Map<String, dynamic>> readNfcStatus({int? timeoutMs}) =>
+      _invoke('readNfcStatus', timeoutMs: timeoutMs);
+  Future<Map<String, dynamic>> setNfcEnabled({
     required bool enabled,
     int? timeoutMs,
   }) => _invoke(
-    _control,
     'setNfcEnabled',
     timeoutMs: timeoutMs,
     payload: {'enabled': enabled},
   );
-  Future<BridgeResponse> factoryReset({int? timeoutMs}) => _invoke(
-    _control,
-    'factoryReset',
-    timeoutMs: timeoutMs,
-  );
-  Future<BridgeResponse> readGearMaxSpeed({
+  Future<Map<String, dynamic>> factoryReset({int? timeoutMs}) =>
+      _invoke('factoryReset', timeoutMs: timeoutMs);
+  Future<Map<String, dynamic>> readGearMaxSpeed({
     required int gear,
     int? timeoutMs,
   }) => _invoke(
-    _control,
     'readGearMaxSpeed',
     timeoutMs: timeoutMs,
     payload: {'gear': gear},
   );
-  Future<BridgeResponse> setAmbientLight({
+  Future<Map<String, dynamic>> setAmbientLight({
     required bool on,
     int? timeoutMs,
-  }) => _invoke(
-    _control,
-    'setAmbientLight',
-    timeoutMs: timeoutMs,
-    payload: {'on': on},
-  );
-  Future<BridgeResponse> setAmbientRgb({
+  }) => _invoke('setAmbientLight', timeoutMs: timeoutMs, payload: {'on': on});
+  Future<Map<String, dynamic>> setAmbientRgb({
     required int mode,
     required int red,
     required int green,
@@ -208,7 +119,6 @@ class ScooterBridgeClient {
     int brightness = 255,
     int? timeoutMs,
   }) => _invoke(
-    _control,
     'setAmbientRgb',
     timeoutMs: timeoutMs,
     payload: {
@@ -219,117 +129,55 @@ class ScooterBridgeClient {
       'brightness': brightness,
     },
   );
-  Future<BridgeResponse> setRainbowMode({int? timeoutMs}) => _invoke(
-    _control,
-    'setRainbowMode',
-    timeoutMs: timeoutMs,
-  );
-  Future<BridgeResponse> setGear({required int gear, int? timeoutMs}) => _invoke(
-    _control,
-    'setGear',
-    timeoutMs: timeoutMs,
-    payload: {'gear': gear},
-  );
-  Future<BridgeResponse> setFrontLight({required bool on, int? timeoutMs}) =>
-      _invoke(
-        _control,
-        'setFrontLight',
-        timeoutMs: timeoutMs,
-        payload: {'on': on},
-      );
+  Future<Map<String, dynamic>> setRainbowMode({int? timeoutMs}) =>
+      _invoke('setRainbowMode', timeoutMs: timeoutMs);
+  Future<Map<String, dynamic>> setGear({required int gear, int? timeoutMs}) =>
+      _invoke('setGear', timeoutMs: timeoutMs, payload: {'gear': gear});
+  Future<Map<String, dynamic>> setFrontLight({
+    required bool on,
+    int? timeoutMs,
+  }) => _invoke('setFrontLight', timeoutMs: timeoutMs, payload: {'on': on});
 
-  Future<BridgeResponse> _invoke(
-    MethodChannel channel,
+  Future<Map<String, dynamic>> _invoke(
     String method, {
     Map<String, dynamic> payload = const {},
     int? timeoutMs,
   }) async {
-    final requestId = _nextRequestId();
-    final args = <String, Object?>{
-      'requestId': requestId,
-      'timeoutMs': timeoutMs,
-      'payload': payload,
-    };
+    final args = <String, Object?>{'timeoutMs': timeoutMs, 'payload': payload};
 
-    final raw = await channel.invokeMethod<Object?>(method, args);
+    final raw = await _bridge.invokeMethod<Object?>(method, args);
     if (raw is! Map) {
-      throw BridgeException(
+      throw PlatformException(
         code: 'INTERNAL_ERROR',
         message: 'Native response is not a map',
-        retriable: false,
       );
     }
-
-    final envelope = raw as JsonMap;
-    final ok = (envelope['ok'] as bool?) ?? false;
-    if (!ok) {
-      final errMap = envelope['error'];
-      if (errMap is Map) {
-        throw BridgeException.fromErrorMap(errMap as JsonMap);
+    final normalized = raw.map((key, value) => MapEntry(key.toString(), value));
+    if (normalized.containsKey('ok')) {
+      final ok = normalized['ok'] == true;
+      if (!ok) {
+        final err = normalized['error'];
+        if (err is Map) {
+          final errorMap = err.map(
+            (key, value) => MapEntry(key.toString(), value),
+          );
+          throw PlatformException(
+            code: (errorMap['code']?.toString()) ?? 'INTERNAL_ERROR',
+            message: errorMap['message']?.toString(),
+            details: errorMap['details'],
+          );
+        }
+        throw PlatformException(
+          code: 'INTERNAL_ERROR',
+          message: 'Native error envelope is malformed',
+        );
       }
-      throw BridgeException(
-        code: 'INTERNAL_ERROR',
-        message: 'Native error envelope is malformed',
-        retriable: false,
-      );
-    }
-
-    return BridgeResponse.fromMap(envelope);
-  }
-
-  Stream<Map<String, dynamic>> _mapEvent(EventChannel channel) {
-    return channel.receiveBroadcastStream().map((event) {
-      if (event is Map) {
-        return event.map((key, value) => MapEntry(key.toString(), value));
+      final data = normalized['data'];
+      if (data is Map) {
+        return data.map((key, value) => MapEntry(key.toString(), value));
       }
-      return <String, dynamic>{
-        'type': 'raw',
-        'timestampMs': DateTime.now().millisecondsSinceEpoch,
-        'data': event,
-      };
-    });
-  }
-
-  Map<String, dynamic>? _faultDataFromEvent(Map<String, dynamic> event) {
-    final type = event['type']?.toString();
-    final data = event['data'];
-    if (data is! Map) return null;
-    final normalized = data.map((key, value) => MapEntry(key.toString(), value));
-    if (type == 'faultFlags') return normalized;
-    if (type == 'heartbeat' && normalized['faults'] is Map) {
-      final faults = (normalized['faults'] as Map)
-          .map((key, value) => MapEntry(key.toString(), value));
-      return faults;
+      return <String, dynamic>{};
     }
-    return null;
-  }
-
-  Map<String, dynamic>? _operationalDataFromEvent(Map<String, dynamic> event) {
-    final type = event['type']?.toString();
-    final data = event['data'];
-    if (data is! Map) return null;
-    final normalized = data.map((key, value) => MapEntry(key.toString(), value));
-    if (type == 'operationalStatus') return normalized;
-    if (type == 'heartbeat') {
-      return {
-        'lockStatus': normalized['lockStatus'],
-        'headlightOn': normalized['headlightOn'],
-        'cruiseEnabled': normalized['cruiseEnabled'],
-        'cruiseActive': normalized['cruiseActive'],
-        'startMode': normalized['startMode'],
-        'gear': normalized['gear'],
-        'metricUnit': normalized['metricUnit'],
-        'charging': normalized['charging'],
-        'motorRunning': normalized['motorRunning'],
-        'electronicBrake': normalized['electronicBrake'],
-        'mechanicalBrake': normalized['mechanicalBrake'],
-      };
-    }
-    return null;
-  }
-
-  String _nextRequestId() {
-    _reqCounter += 1;
-    return '${DateTime.now().microsecondsSinceEpoch}-$_reqCounter';
+    return normalized;
   }
 }

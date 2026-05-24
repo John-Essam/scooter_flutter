@@ -7,22 +7,34 @@ class ScooterHomeScreen extends StatelessWidget {
     required this.batteryPercent,
     required this.isLocked,
     required this.currentGear,
+    required this.headlightOn,
+    required this.cruiseEnabled,
     required this.onToggleLock,
     required this.onSetGear,
+    required this.onSetHeadlight,
+    required this.onSetCruiseControl,
     required this.onDisconnect,
     this.isUpdatingLock = false,
     this.isUpdatingGear = false,
+    this.isUpdatingHeadlight = false,
+    this.isUpdatingCruise = false,
   });
 
   final String deviceId;
   final int batteryPercent;
   final bool isLocked;
   final int currentGear;
+  final bool headlightOn;
+  final bool cruiseEnabled;
   final Future<void> Function(bool locked) onToggleLock;
   final Future<void> Function(int gear) onSetGear;
+  final Future<void> Function(bool on) onSetHeadlight;
+  final Future<void> Function(bool enabled) onSetCruiseControl;
   final Future<void> Function() onDisconnect;
   final bool isUpdatingLock;
   final bool isUpdatingGear;
+  final bool isUpdatingHeadlight;
+  final bool isUpdatingCruise;
 
   @override
   Widget build(BuildContext context) {
@@ -107,6 +119,34 @@ class ScooterHomeScreen extends StatelessWidget {
                   currentGear: currentGear,
                   busy: isUpdatingGear,
                   onSetGear: onSetGear,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: _BinaryFeatureCard(
+                  title: 'Headlight',
+                  subtitle: 'Front light control',
+                  activeLabel: 'ON',
+                  inactiveLabel: 'OFF',
+                  value: headlightOn,
+                  busy: isUpdatingHeadlight,
+                  accent: const Color(0xFFFFB347),
+                  icon: Icons.lightbulb_outline,
+                  onChanged: onSetHeadlight,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: _BinaryFeatureCard(
+                  title: 'Cruise Control',
+                  subtitle: 'Speed hold assistant',
+                  activeLabel: 'ON',
+                  inactiveLabel: 'OFF',
+                  value: cruiseEnabled,
+                  busy: isUpdatingCruise,
+                  accent: const Color(0xFF35A6FF),
+                  icon: Icons.assistant_navigation,
+                  onChanged: onSetCruiseControl,
                 ),
               ),
               Padding(
@@ -230,6 +270,152 @@ class _PowerGearCard extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BinaryFeatureCard extends StatelessWidget {
+  const _BinaryFeatureCard({
+    required this.title,
+    required this.subtitle,
+    required this.activeLabel,
+    required this.inactiveLabel,
+    required this.value,
+    required this.busy,
+    required this.accent,
+    required this.icon,
+    required this.onChanged,
+  });
+
+  final String title;
+  final String subtitle;
+  final String activeLabel;
+  final String inactiveLabel;
+  final bool value;
+  final bool busy;
+  final Color accent;
+  final IconData icon;
+  final Future<void> Function(bool value) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, color: accent, size: 20),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: Color(0xFF003E75),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                        ),
+                      ),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          color: Color(0xFF6B7A90),
+                          fontWeight: FontWeight.w500,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (busy)
+                  const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFFF2F5FA),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              padding: const EdgeInsets.all(4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _FeatureToggleOption(
+                      label: inactiveLabel,
+                      selected: !value,
+                      onTap: busy || !value ? null : () => onChanged(false),
+                    ),
+                  ),
+                  Expanded(
+                    child: _FeatureToggleOption(
+                      label: activeLabel,
+                      selected: value,
+                      onTap: busy || value ? null : () => onChanged(true),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FeatureToggleOption extends StatelessWidget {
+  const _FeatureToggleOption({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        margin: const EdgeInsets.symmetric(horizontal: 2),
+        height: 44,
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFF003E75) : Colors.transparent,
+          borderRadius: BorderRadius.circular(11),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? Colors.white : const Color(0xFF6B7A90),
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
+          ),
         ),
       ),
     );
