@@ -18,6 +18,7 @@ import com.example.scooter_android_demo.commands.Tcb0BCommands
 import com.example.scooter_android_demo.commands.Tcb1ACommands
 import com.example.scooter_android_demo.commands.Tcb22Commands
 import com.example.scooter_android_demo.commands.Tcb30Commands
+import com.example.scooter_android_demo.commands.TcbSerialNumberCommands
 import com.example.scooter_android_demo.model.AmbientRgbStatus
 import com.example.scooter_android_demo.model.Heartbeat
 import com.example.scooter_android_demo.model.enums.AmbientLightMode
@@ -68,6 +69,7 @@ internal class RealAndroidBleBridge(
     private var tripMileageDeferred: CompletableDeferred<Float>? = null
     private var totalMileageDeferred: CompletableDeferred<Float>? = null
     private var speedStatsDeferred: CompletableDeferred<Pair<Float, Float>>? = null
+    private var serialNumberDeferred: CompletableDeferred<String>? = null
     private var connectedDeviceId: String? = null
     private var lastScanFingerprint: String? = null
     private var lastHeartbeatRxLogMs: Long = 0L
@@ -189,6 +191,8 @@ internal class RealAndroidBleBridge(
         totalMileageDeferred = null
         speedStatsDeferred?.cancel()
         speedStatsDeferred = null
+        serialNumberDeferred?.cancel()
+        serialNumberDeferred = null
         return mapOf("state" to "idle")
     }
 
@@ -566,6 +570,23 @@ internal class RealAndroidBleBridge(
         )
     }
 
+    suspend fun readSerialNumber(timeoutMs: Long): Map<String, Any?> {
+        val deferred = CompletableDeferred<String>()
+        serialNumberDeferred?.cancel()
+        serialNumberDeferred = deferred
+        emitLog("control", "readSerialNumber requested timeoutMs=$timeoutMs")
+        connection.send(TcbSerialNumberCommands.readSerialNumber())
+
+        val matched = withTimeoutOrNull(timeoutMs) { deferred.await() }
+            ?: throw BridgeNativeException(
+                code = ErrorCodes.TIMEOUT,
+                message = "Serial number read timeout",
+                retriable = true,
+                details = mapOf("timeoutMs" to timeoutMs),
+            )
+        return mapOf("serialNumber" to matched)
+    }
+
     suspend fun setGear(gear: Int, timeoutMs: Long): Map<String, Any?> {
         val resolved = when (gear) {
             0 -> ScooterGear.ZERO
@@ -781,6 +802,17 @@ internal class RealAndroidBleBridge(
                     )
                 }
                 speedStatsDeferred = null
+                if (serialNumberDeferred?.isCompleted == false) {
+                    serialNumberDeferred?.completeExceptionally(
+                        BridgeNativeException(
+                            code = ErrorCodes.BLE_DISCONNECTED,
+                            message = "Disconnected while waiting serial number read",
+                            retriable = true,
+                            details = null,
+                        )
+                    )
+                }
+                serialNumberDeferred = null
                 pendingConnectMac = null
             }
             BleState.Scanning -> emitConnection("scanning", reason = null, retriable = false, device = null)
@@ -952,6 +984,11 @@ internal class RealAndroidBleBridge(
                 )
                 speedStatsDeferred?.complete(parsed.avgKmh to parsed.maxKmh)
                 speedStatsDeferred = null
+            }
+            is TcbResponse.SerialNumberUpdate -> {
+                emitTelemetry("serialNumber", mapOf("serialNumber" to parsed.serial))
+                serialNumberDeferred?.complete(parsed.serial)
+                serialNumberDeferred = null
             }
             null -> Unit
             else -> {
