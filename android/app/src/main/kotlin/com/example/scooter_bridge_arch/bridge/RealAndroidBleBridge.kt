@@ -11,8 +11,11 @@ import com.example.scooter_android_demo.commands.Tcb02Commands
 import com.example.scooter_android_demo.commands.Tcb03Commands
 import com.example.scooter_android_demo.commands.Tcb04Commands
 import com.example.scooter_android_demo.commands.Tcb05Commands
+import com.example.scooter_android_demo.commands.Tcb1ACommands
 import com.example.scooter_android_demo.commands.Tcb22Commands
+import com.example.scooter_android_demo.model.AmbientRgbStatus
 import com.example.scooter_android_demo.model.Heartbeat
+import com.example.scooter_android_demo.model.enums.AmbientLightMode
 import com.example.scooter_android_demo.model.enums.ScooterGear
 import com.example.scooter_android_demo.model.enums.DeviceModel
 import com.example.scooter_android_demo.protocol.TcbResponse
@@ -320,6 +323,53 @@ internal class RealAndroidBleBridge(
         return mapOf("ambientOn" to matched)
     }
 
+    fun setAmbientRgb(mode: Int, red: Int, green: Int, blue: Int, brightness: Int): Map<String, Any?> {
+        fun validateColor(name: String, value: Int) {
+            if (value !in 0..255) {
+                throw BridgeNativeException(
+                    code = ErrorCodes.INVALID_ARGUMENT,
+                    message = "payload.$name must be 0..255",
+                    retriable = false,
+                    details = mapOf(name to value),
+                )
+            }
+        }
+        validateColor("red", red)
+        validateColor("green", green)
+        validateColor("blue", blue)
+        validateColor("brightness", brightness)
+        val ambientMode = when (mode) {
+            1 -> AmbientLightMode.Monochrome
+            2 -> AmbientLightMode.MonochromeBreathing
+            3 -> AmbientLightMode.Rainbow
+            4 -> AmbientLightMode.RunningEffect
+            else -> throw BridgeNativeException(
+                code = ErrorCodes.INVALID_ARGUMENT,
+                message = "payload.mode must be 1..4",
+                retriable = false,
+                details = mapOf("mode" to mode),
+            )
+        }
+        connection.send(
+            Tcb1ACommands.writeAmbientLight(
+                AmbientRgbStatus(
+                    mode = ambientMode,
+                    red = red,
+                    green = green,
+                    blue = blue,
+                    brightness = brightness,
+                )
+            )
+        )
+        return mapOf(
+            "mode" to mode,
+            "red" to red,
+            "green" to green,
+            "blue" to blue,
+            "brightness" to brightness,
+        )
+    }
+
     suspend fun setGear(gear: Int, timeoutMs: Long): Map<String, Any?> {
         val resolved = when (gear) {
             0 -> ScooterGear.ZERO
@@ -573,6 +623,18 @@ internal class RealAndroidBleBridge(
                     expectedAmbientLight = null
                 }
                 emitTelemetry("light", mapOf("ambientOn" to parsed.value.ambientOn))
+            }
+            is TcbResponse.AmbientRgbUpdate -> {
+                emitTelemetry(
+                    "ambientRgb",
+                    mapOf(
+                        "mode" to parsed.value.mode.name,
+                        "red" to parsed.value.red,
+                        "green" to parsed.value.green,
+                        "blue" to parsed.value.blue,
+                        "brightness" to parsed.value.brightness,
+                    )
+                )
             }
             null -> Unit
             else -> {

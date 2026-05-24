@@ -120,6 +120,25 @@ class ScooterBridgeClient {
     timeoutMs: timeoutMs,
     payload: {'on': on},
   );
+  Future<BridgeResponse> setAmbientRgb({
+    required int mode,
+    required int red,
+    required int green,
+    required int blue,
+    int brightness = 255,
+    int? timeoutMs,
+  }) => _invoke(
+    _control,
+    'setAmbientRgb',
+    timeoutMs: timeoutMs,
+    payload: {
+      'mode': mode,
+      'red': red,
+      'green': green,
+      'blue': blue,
+      'brightness': brightness,
+    },
+  );
   Future<BridgeResponse> setGear({required int gear, int? timeoutMs}) => _invoke(
     _control,
     'setGear',

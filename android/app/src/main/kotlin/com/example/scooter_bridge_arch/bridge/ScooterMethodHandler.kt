@@ -192,6 +192,65 @@ internal class ScooterMethodHandler(
                     )
                 native.setAmbientLight(on, timeoutMs)
             }
+            "setAmbientRgb" -> {
+                val mode = when (val value = payload["mode"]) {
+                    is Int -> value
+                    is Long -> value.toInt()
+                    is Double -> value.toInt()
+                    else -> throw BridgeNativeException(
+                        code = ErrorCodes.INVALID_ARGUMENT,
+                        message = "payload.mode is required",
+                        retriable = false,
+                        details = null,
+                    )
+                }
+                val red = when (val value = payload["red"]) {
+                    is Int -> value
+                    is Long -> value.toInt()
+                    is Double -> value.toInt()
+                    else -> throw BridgeNativeException(
+                        code = ErrorCodes.INVALID_ARGUMENT,
+                        message = "payload.red is required",
+                        retriable = false,
+                        details = null,
+                    )
+                }
+                val green = when (val value = payload["green"]) {
+                    is Int -> value
+                    is Long -> value.toInt()
+                    is Double -> value.toInt()
+                    else -> throw BridgeNativeException(
+                        code = ErrorCodes.INVALID_ARGUMENT,
+                        message = "payload.green is required",
+                        retriable = false,
+                        details = null,
+                    )
+                }
+                val blue = when (val value = payload["blue"]) {
+                    is Int -> value
+                    is Long -> value.toInt()
+                    is Double -> value.toInt()
+                    else -> throw BridgeNativeException(
+                        code = ErrorCodes.INVALID_ARGUMENT,
+                        message = "payload.blue is required",
+                        retriable = false,
+                        details = null,
+                    )
+                }
+                val brightness = when (val value = payload["brightness"]) {
+                    null -> 255
+                    is Int -> value
+                    is Long -> value.toInt()
+                    is Double -> value.toInt()
+                    else -> throw BridgeNativeException(
+                        code = ErrorCodes.INVALID_ARGUMENT,
+                        message = "payload.brightness must be numeric",
+                        retriable = false,
+                        details = null,
+                    )
+                }
+                native.setAmbientRgb(mode, red, green, blue, brightness)
+            }
             "setGear" -> {
                 val gear = when (val value = payload["gear"]) {
                     is Int -> value
