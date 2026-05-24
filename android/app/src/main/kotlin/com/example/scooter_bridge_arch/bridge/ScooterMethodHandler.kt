@@ -144,6 +144,7 @@ internal class ScooterMethodHandler(
                     )
                 native.setUnitSystem(metric)
             }
+            "readThrottleResponse" -> native.readThrottleResponse(timeoutMs)
             "setGear" -> {
                 val gear = when (val value = payload["gear"]) {
                     is Int -> value

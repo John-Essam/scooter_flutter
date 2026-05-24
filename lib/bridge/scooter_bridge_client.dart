@@ -77,6 +77,11 @@ class ScooterBridgeClient {
     timeoutMs: timeoutMs,
     payload: {'metric': metric},
   );
+  Future<BridgeResponse> readThrottleResponse({int? timeoutMs}) => _invoke(
+    _control,
+    'readThrottleResponse',
+    timeoutMs: timeoutMs,
+  );
   Future<BridgeResponse> setGear({required int gear, int? timeoutMs}) => _invoke(
     _control,
     'setGear',

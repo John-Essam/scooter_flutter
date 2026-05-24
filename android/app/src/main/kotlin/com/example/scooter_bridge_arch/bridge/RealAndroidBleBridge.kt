@@ -10,6 +10,7 @@ import com.example.scooter_android_demo.ble.ScanResult
 import com.example.scooter_android_demo.commands.Tcb02Commands
 import com.example.scooter_android_demo.commands.Tcb04Commands
 import com.example.scooter_android_demo.commands.Tcb05Commands
+import com.example.scooter_android_demo.commands.Tcb22Commands
 import com.example.scooter_android_demo.model.Heartbeat
 import com.example.scooter_android_demo.model.enums.ScooterGear
 import com.example.scooter_android_demo.model.enums.DeviceModel
@@ -40,6 +41,7 @@ internal class RealAndroidBleBridge(
     private var expectedLockState: Boolean? = null
     private var gearDeferred: CompletableDeferred<Int>? = null
     private var expectedGear: Int? = null
+    private var throttleResponseDeferred: CompletableDeferred<Int>? = null
     private var connectedDeviceId: String? = null
     private var lastScanFingerprint: String? = null
     private var lastHeartbeatRxLogMs: Long = 0L
@@ -138,6 +140,8 @@ internal class RealAndroidBleBridge(
         gearDeferred?.cancel()
         gearDeferred = null
         expectedGear = null
+        throttleResponseDeferred?.cancel()
+        throttleResponseDeferred = null
         return mapOf("state" to "idle")
     }
 
@@ -184,6 +188,23 @@ internal class RealAndroidBleBridge(
     fun setUnitSystem(metric: Boolean): Map<String, Any?> {
         connection.send(Tcb02Commands.unitSystem(metric))
         return mapOf("metricUnit" to metric)
+    }
+
+    suspend fun readThrottleResponse(timeoutMs: Long): Map<String, Any?> {
+        val deferred = CompletableDeferred<Int>()
+        throttleResponseDeferred?.cancel()
+        throttleResponseDeferred = deferred
+        emitLog("control", "readThrottleResponse requested timeoutMs=$timeoutMs")
+        connection.send(Tcb22Commands.readThrottleResponse())
+
+        val matched = withTimeoutOrNull(timeoutMs) { deferred.await() }
+            ?: throw BridgeNativeException(
+                code = ErrorCodes.TIMEOUT,
+                message = "Throttle response read timeout",
+                retriable = true,
+                details = mapOf("timeoutMs" to timeoutMs),
+            )
+        return mapOf("throttleResponse" to matched)
     }
 
     suspend fun setGear(gear: Int, timeoutMs: Long): Map<String, Any?> {
@@ -288,6 +309,17 @@ internal class RealAndroidBleBridge(
                 }
                 gearDeferred = null
                 expectedGear = null
+                if (throttleResponseDeferred?.isCompleted == false) {
+                    throttleResponseDeferred?.completeExceptionally(
+                        BridgeNativeException(
+                            code = ErrorCodes.BLE_DISCONNECTED,
+                            message = "Disconnected while waiting throttle response read",
+                            retriable = true,
+                            details = null,
+                        )
+                    )
+                }
+                throttleResponseDeferred = null
                 pendingConnectMac = null
             }
             BleState.Scanning -> emitConnection("scanning", reason = null, retriable = false, device = null)
@@ -360,6 +392,16 @@ internal class RealAndroidBleBridge(
                         "boundId" to parsed.value.boundId,
                     )
                 )
+            }
+            is TcbResponse.ResponseTuningUpdate -> {
+                val throttleValue = parsed.value.throttle
+                if (throttleValue != null) {
+                    throttleResponseDeferred?.complete(throttleValue)
+                    throttleResponseDeferred = null
+                    emitTelemetry("responseTuning", mapOf("throttle" to throttleValue))
+                } else {
+                    emitTelemetry("responseTuning", mapOf("brake" to parsed.value.brake))
+                }
             }
             null -> Unit
             else -> {
