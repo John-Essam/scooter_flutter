@@ -11,6 +11,7 @@ import com.example.scooter_android_demo.commands.Tcb02Commands
 import com.example.scooter_android_demo.commands.Tcb03Commands
 import com.example.scooter_android_demo.commands.Tcb04Commands
 import com.example.scooter_android_demo.commands.Tcb05Commands
+import com.example.scooter_android_demo.commands.Tcb0ACommands
 import com.example.scooter_android_demo.commands.Tcb1ACommands
 import com.example.scooter_android_demo.commands.Tcb22Commands
 import com.example.scooter_android_demo.model.AmbientRgbStatus
@@ -18,6 +19,7 @@ import com.example.scooter_android_demo.model.Heartbeat
 import com.example.scooter_android_demo.model.enums.AmbientLightMode
 import com.example.scooter_android_demo.model.enums.ScooterGear
 import com.example.scooter_android_demo.model.enums.DeviceModel
+import com.example.scooter_android_demo.model.enums.TempType
 import com.example.scooter_android_demo.protocol.TcbResponse
 import com.example.scooter_android_demo.protocol.TcbResponseParser
 import com.example.tcblecomminucation.TCBConstant.TCBResponseType
@@ -54,6 +56,8 @@ internal class RealAndroidBleBridge(
     private var expectedNfcStatus: Boolean? = null
     private var ambientLightDeferred: CompletableDeferred<Boolean>? = null
     private var expectedAmbientLight: Boolean? = null
+    private var temperatureDeferred: CompletableDeferred<Int>? = null
+    private var expectedTemperatureType: TempType? = null
     private var connectedDeviceId: String? = null
     private var lastScanFingerprint: String? = null
     private var lastHeartbeatRxLogMs: Long = 0L
@@ -162,6 +166,9 @@ internal class RealAndroidBleBridge(
         ambientLightDeferred?.cancel()
         ambientLightDeferred = null
         expectedAmbientLight = null
+        temperatureDeferred?.cancel()
+        temperatureDeferred = null
+        expectedTemperatureType = null
         return mapOf("state" to "idle")
     }
 
@@ -385,6 +392,27 @@ internal class RealAndroidBleBridge(
         return mapOf("rainbowMode" to true)
     }
 
+    suspend fun readControllerTemperature(timeoutMs: Long): Map<String, Any?> {
+        val deferred = CompletableDeferred<Int>()
+        temperatureDeferred?.cancel()
+        temperatureDeferred = deferred
+        expectedTemperatureType = TempType.Controller
+        emitLog("control", "readControllerTemperature requested timeoutMs=$timeoutMs")
+        connection.send(Tcb0ACommands.readControllerTemp())
+
+        val matched = withTimeoutOrNull(timeoutMs) { deferred.await() }
+            ?: throw BridgeNativeException(
+                code = ErrorCodes.TIMEOUT,
+                message = "Controller temperature read timeout",
+                retriable = true,
+                details = mapOf("timeoutMs" to timeoutMs),
+            )
+        return mapOf(
+            "controllerTemperatureC" to matched,
+            "type" to "controller",
+        )
+    }
+
     suspend fun setGear(gear: Int, timeoutMs: Long): Map<String, Any?> {
         val resolved = when (gear) {
             0 -> ScooterGear.ZERO
@@ -533,6 +561,18 @@ internal class RealAndroidBleBridge(
                 }
                 ambientLightDeferred = null
                 expectedAmbientLight = null
+                if (temperatureDeferred?.isCompleted == false) {
+                    temperatureDeferred?.completeExceptionally(
+                        BridgeNativeException(
+                            code = ErrorCodes.BLE_DISCONNECTED,
+                            message = "Disconnected while waiting controller temperature read",
+                            retriable = true,
+                            details = null,
+                        )
+                    )
+                }
+                temperatureDeferred = null
+                expectedTemperatureType = null
                 pendingConnectMac = null
             }
             BleState.Scanning -> emitConnection("scanning", reason = null, retriable = false, device = null)
@@ -652,6 +692,21 @@ internal class RealAndroidBleBridge(
                         "brightness" to parsed.value.brightness,
                     )
                 )
+            }
+            is TcbResponse.TemperatureUpdate -> {
+                emitTelemetry(
+                    "temperature",
+                    mapOf(
+                        "type" to parsed.type.name.lowercase(),
+                        "celsius" to parsed.celsius,
+                    )
+                )
+                val expected = expectedTemperatureType
+                if (expected != null && expected == parsed.type) {
+                    temperatureDeferred?.complete(parsed.celsius)
+                    temperatureDeferred = null
+                    expectedTemperatureType = null
+                }
             }
             null -> Unit
             else -> {
