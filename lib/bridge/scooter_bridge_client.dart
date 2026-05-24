@@ -138,6 +138,11 @@ class ScooterBridgeClient {
     'readSerialNumber',
     timeoutMs: timeoutMs,
   );
+  Future<BridgeResponse> readDeviceInfo({int? timeoutMs}) => _invoke(
+    _control,
+    'readDeviceInfo',
+    timeoutMs: timeoutMs,
+  );
   Future<BridgeResponse> setThrottleBrakeResponse({
     required int throttle,
     required int brake,

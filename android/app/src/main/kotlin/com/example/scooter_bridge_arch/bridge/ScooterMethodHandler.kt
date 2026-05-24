@@ -155,6 +155,7 @@ internal class ScooterMethodHandler(
             "readOdo" -> native.readOdo(timeoutMs)
             "readSpeedStats" -> native.readSpeedStats(timeoutMs)
             "readSerialNumber" -> native.readSerialNumber(timeoutMs)
+            "readDeviceInfo" -> native.readDeviceInfo(timeoutMs)
             "setThrottleBrakeResponse" -> {
                 val throttle = when (val value = payload["throttle"]) {
                     is Int -> value

@@ -70,6 +70,7 @@ internal class RealAndroidBleBridge(
     private var totalMileageDeferred: CompletableDeferred<Float>? = null
     private var speedStatsDeferred: CompletableDeferred<Pair<Float, Float>>? = null
     private var serialNumberDeferred: CompletableDeferred<String>? = null
+    private var deviceInfoDeferred: CompletableDeferred<String>? = null
     private var connectedDeviceId: String? = null
     private var lastScanFingerprint: String? = null
     private var lastHeartbeatRxLogMs: Long = 0L
@@ -193,6 +194,8 @@ internal class RealAndroidBleBridge(
         speedStatsDeferred = null
         serialNumberDeferred?.cancel()
         serialNumberDeferred = null
+        deviceInfoDeferred?.cancel()
+        deviceInfoDeferred = null
         return mapOf("state" to "idle")
     }
 
@@ -587,6 +590,23 @@ internal class RealAndroidBleBridge(
         return mapOf("serialNumber" to matched)
     }
 
+    suspend fun readDeviceInfo(timeoutMs: Long): Map<String, Any?> {
+        val deferred = CompletableDeferred<String>()
+        deviceInfoDeferred?.cancel()
+        deviceInfoDeferred = deferred
+        emitLog("control", "readDeviceInfo requested timeoutMs=$timeoutMs")
+        connection.send(TcbManualFrame.read(functionCode = 0x1E))
+
+        val matched = withTimeoutOrNull(timeoutMs) { deferred.await() }
+            ?: throw BridgeNativeException(
+                code = ErrorCodes.TIMEOUT,
+                message = "Device info read timeout",
+                retriable = true,
+                details = mapOf("timeoutMs" to timeoutMs),
+            )
+        return mapOf("deviceInfo" to matched)
+    }
+
     suspend fun setGear(gear: Int, timeoutMs: Long): Map<String, Any?> {
         val resolved = when (gear) {
             0 -> ScooterGear.ZERO
@@ -813,6 +833,17 @@ internal class RealAndroidBleBridge(
                     )
                 }
                 serialNumberDeferred = null
+                if (deviceInfoDeferred?.isCompleted == false) {
+                    deviceInfoDeferred?.completeExceptionally(
+                        BridgeNativeException(
+                            code = ErrorCodes.BLE_DISCONNECTED,
+                            message = "Disconnected while waiting device info read",
+                            retriable = true,
+                            details = null,
+                        )
+                    )
+                }
+                deviceInfoDeferred = null
                 pendingConnectMac = null
             }
             BleState.Scanning -> emitConnection("scanning", reason = null, retriable = false, device = null)
@@ -989,6 +1020,11 @@ internal class RealAndroidBleBridge(
                 emitTelemetry("serialNumber", mapOf("serialNumber" to parsed.serial))
                 serialNumberDeferred?.complete(parsed.serial)
                 serialNumberDeferred = null
+            }
+            is TcbResponse.DeviceInfoUpdate -> {
+                emitTelemetry("deviceInfo", mapOf("deviceInfo" to parsed.info))
+                deviceInfoDeferred?.complete(parsed.info)
+                deviceInfoDeferred = null
             }
             null -> Unit
             else -> {
