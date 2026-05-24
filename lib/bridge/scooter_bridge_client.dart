@@ -118,6 +118,11 @@ class ScooterBridgeClient {
     'readRemainingMileage',
     timeoutMs: timeoutMs,
   );
+  Future<BridgeResponse> readTripMileage({int? timeoutMs}) => _invoke(
+    _control,
+    'readTripMileage',
+    timeoutMs: timeoutMs,
+  );
   Future<BridgeResponse> setThrottleBrakeResponse({
     required int throttle,
     required int brake,
