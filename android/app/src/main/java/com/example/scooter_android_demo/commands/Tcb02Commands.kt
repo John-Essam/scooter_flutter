@@ -10,6 +10,7 @@ object Tcb02Commands {
     private const val START_MODE_MASK = 0x02
 
     fun connect(authLevel: Int = 5): ByteArray = TCB02CMD.writeConnect(authLevel)
+    fun unitSystem(metric: Boolean): ByteArray = TCB02CMD.writeMetricMileSystemTheme(metric)
     fun lockStatus(locked: Boolean): ByteArray = TCB02CMD.writeLockStatus(locked)
     fun cruiseControl(enabled: Boolean): ByteArray = TCB02CMD.writeCruiseControlFunction(enabled)
     fun startMode(enabled: Boolean): ByteArray = writeFeatureBit(enabled, START_MODE_MASK)

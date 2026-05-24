@@ -181,6 +181,11 @@ internal class RealAndroidBleBridge(
         return mapOf("startMode" to enabled)
     }
 
+    fun setUnitSystem(metric: Boolean): Map<String, Any?> {
+        connection.send(Tcb02Commands.unitSystem(metric))
+        return mapOf("metricUnit" to metric)
+    }
+
     suspend fun setGear(gear: Int, timeoutMs: Long): Map<String, Any?> {
         val resolved = when (gear) {
             0 -> ScooterGear.ZERO

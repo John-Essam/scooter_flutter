@@ -68,6 +68,15 @@ class ScooterBridgeClient {
     timeoutMs: timeoutMs,
     payload: {'enabled': enabled},
   );
+  Future<BridgeResponse> setUnitSystem({
+    required bool metric,
+    int? timeoutMs,
+  }) => _invoke(
+    _control,
+    'setUnitSystem',
+    timeoutMs: timeoutMs,
+    payload: {'metric': metric},
+  );
   Future<BridgeResponse> setGear({required int gear, int? timeoutMs}) => _invoke(
     _control,
     'setGear',

@@ -134,6 +134,16 @@ internal class ScooterMethodHandler(
                     )
                 native.setStartMode(enabled)
             }
+            "setUnitSystem" -> {
+                val metric = payload["metric"] as? Boolean
+                    ?: throw BridgeNativeException(
+                        code = ErrorCodes.INVALID_ARGUMENT,
+                        message = "payload.metric is required",
+                        retriable = false,
+                        details = null,
+                    )
+                native.setUnitSystem(metric)
+            }
             "setGear" -> {
                 val gear = when (val value = payload["gear"]) {
                     is Int -> value
