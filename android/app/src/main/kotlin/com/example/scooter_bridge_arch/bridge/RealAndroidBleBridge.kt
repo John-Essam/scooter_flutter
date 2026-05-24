@@ -583,6 +583,7 @@ internal class RealAndroidBleBridge(
             is TcbResponse.HeartbeatUpdate -> {
                 latestHeartbeat = parsed.value
                 emitTelemetry("heartbeat", heartbeatMap(parsed.value))
+                emitTelemetry("faultFlags", faultMap(parsed.value))
                 val expected = expectedLockState
                 if (expected != null && parsed.value.locked == expected) {
                     expectedLockState = null
@@ -672,20 +673,23 @@ internal class RealAndroidBleBridge(
             "cruiseEnabled" to hb.cruiseOn,
             "metricUnit" to hb.metricUnit,
             "startMode" to hb.startMode,
-            "faults" to mapOf(
-                "undervoltage" to hb.faults.undervoltage,
-                "gyroscope" to hb.faults.gyroscope,
-                "battery" to hb.faults.battery,
-                "controller" to hb.faults.controller,
-                "mos" to hb.faults.mos,
-                "motorHall" to hb.faults.motorHall,
-                "brake" to hb.faults.brake,
-                "turnHandle" to hb.faults.turnHandle,
-                "communication" to hb.faults.communication,
-                "batteryOvervoltage" to hb.faults.batteryOvervoltage,
-                "batteryTemperatureHigh" to hb.faults.batteryTemperatureHigh,
-                "controllerTemperatureProtection" to hb.faults.controllerTemperatureProtection,
-            ),
+            "faults" to faultMap(hb),
+        )
+
+    private fun faultMap(hb: Heartbeat): Map<String, Any?> =
+        mapOf(
+            "undervoltage" to hb.faults.undervoltage,
+            "gyroscope" to hb.faults.gyroscope,
+            "battery" to hb.faults.battery,
+            "controller" to hb.faults.controller,
+            "mos" to hb.faults.mos,
+            "motorHall" to hb.faults.motorHall,
+            "brake" to hb.faults.brake,
+            "turnHandle" to hb.faults.turnHandle,
+            "communication" to hb.faults.communication,
+            "batteryOvervoltage" to hb.faults.batteryOvervoltage,
+            "batteryTemperatureHigh" to hb.faults.batteryTemperatureHigh,
+            "controllerTemperatureProtection" to hb.faults.controllerTemperatureProtection,
         )
 
     private fun emitConnection(

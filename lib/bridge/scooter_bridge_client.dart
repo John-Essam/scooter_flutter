@@ -21,6 +21,9 @@ class ScooterBridgeClient {
   int _reqCounter = 0;
 
   Stream<Map<String, dynamic>> telemetryStream() => _mapEvent(_telemetry);
+  Stream<Map<String, dynamic>> faultFlagsStream() => telemetryStream()
+      .where((event) => _faultDataFromEvent(event) != null)
+      .map((event) => _faultDataFromEvent(event)!);
   Stream<Map<String, dynamic>> connectionStateStream() =>
       _mapEvent(_connectionState);
   Stream<Map<String, dynamic>> logsStream() => _mapEvent(_logs);
@@ -208,6 +211,20 @@ class ScooterBridgeClient {
         'data': event,
       };
     });
+  }
+
+  Map<String, dynamic>? _faultDataFromEvent(Map<String, dynamic> event) {
+    final type = event['type']?.toString();
+    final data = event['data'];
+    if (data is! Map) return null;
+    final normalized = data.map((key, value) => MapEntry(key.toString(), value));
+    if (type == 'faultFlags') return normalized;
+    if (type == 'heartbeat' && normalized['faults'] is Map) {
+      final faults = (normalized['faults'] as Map)
+          .map((key, value) => MapEntry(key.toString(), value));
+      return faults;
+    }
+    return null;
   }
 
   String _nextRequestId() {
