@@ -15,6 +15,7 @@ import com.example.scooter_android_demo.commands.Tcb0ACommands
 import com.example.scooter_android_demo.commands.Tcb0BCommands
 import com.example.scooter_android_demo.commands.Tcb1ACommands
 import com.example.scooter_android_demo.commands.Tcb22Commands
+import com.example.scooter_android_demo.commands.Tcb30Commands
 import com.example.scooter_android_demo.model.AmbientRgbStatus
 import com.example.scooter_android_demo.model.Heartbeat
 import com.example.scooter_android_demo.model.enums.AmbientLightMode
@@ -60,6 +61,7 @@ internal class RealAndroidBleBridge(
     private var temperatureDeferred: CompletableDeferred<Int>? = null
     private var expectedTemperatureType: TempType? = null
     private var drivingCurrentDeferred: CompletableDeferred<Pair<Float, Float>>? = null
+    private var remainingMileageDeferred: CompletableDeferred<Float>? = null
     private var connectedDeviceId: String? = null
     private var lastScanFingerprint: String? = null
     private var lastHeartbeatRxLogMs: Long = 0L
@@ -173,6 +175,8 @@ internal class RealAndroidBleBridge(
         expectedTemperatureType = null
         drivingCurrentDeferred?.cancel()
         drivingCurrentDeferred = null
+        remainingMileageDeferred?.cancel()
+        remainingMileageDeferred = null
         return mapOf("state" to "idle")
     }
 
@@ -479,6 +483,23 @@ internal class RealAndroidBleBridge(
         )
     }
 
+    suspend fun readRemainingMileage(timeoutMs: Long): Map<String, Any?> {
+        val deferred = CompletableDeferred<Float>()
+        remainingMileageDeferred?.cancel()
+        remainingMileageDeferred = deferred
+        emitLog("control", "readRemainingMileage requested timeoutMs=$timeoutMs")
+        connection.send(Tcb30Commands.readRemainingMileage())
+
+        val matched = withTimeoutOrNull(timeoutMs) { deferred.await() }
+            ?: throw BridgeNativeException(
+                code = ErrorCodes.TIMEOUT,
+                message = "Remaining mileage read timeout",
+                retriable = true,
+                details = mapOf("timeoutMs" to timeoutMs),
+            )
+        return mapOf("remainingMileageKm" to matched)
+    }
+
     suspend fun setGear(gear: Int, timeoutMs: Long): Map<String, Any?> {
         val resolved = when (gear) {
             0 -> ScooterGear.ZERO
@@ -650,6 +671,17 @@ internal class RealAndroidBleBridge(
                     )
                 }
                 drivingCurrentDeferred = null
+                if (remainingMileageDeferred?.isCompleted == false) {
+                    remainingMileageDeferred?.completeExceptionally(
+                        BridgeNativeException(
+                            code = ErrorCodes.BLE_DISCONNECTED,
+                            message = "Disconnected while waiting remaining mileage read",
+                            retriable = true,
+                            details = null,
+                        )
+                    )
+                }
+                remainingMileageDeferred = null
                 pendingConnectMac = null
             }
             BleState.Scanning -> emitConnection("scanning", reason = null, retriable = false, device = null)
@@ -795,6 +827,11 @@ internal class RealAndroidBleBridge(
                 )
                 drivingCurrentDeferred?.complete(parsed.realtimeAmps to parsed.limitAmps)
                 drivingCurrentDeferred = null
+            }
+            is TcbResponse.RemainingMileageUpdate -> {
+                emitTelemetry("mileage", mapOf("remainingKm" to parsed.value))
+                remainingMileageDeferred?.complete(parsed.value)
+                remainingMileageDeferred = null
             }
             null -> Unit
             else -> {
