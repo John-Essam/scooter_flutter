@@ -8,6 +8,7 @@ import com.example.scooter_android_demo.ble.BleScanner
 import com.example.scooter_android_demo.ble.BleState
 import com.example.scooter_android_demo.ble.ScanResult
 import com.example.scooter_android_demo.commands.Tcb02Commands
+import com.example.scooter_android_demo.commands.Tcb03Commands
 import com.example.scooter_android_demo.commands.Tcb04Commands
 import com.example.scooter_android_demo.commands.Tcb05Commands
 import com.example.scooter_android_demo.commands.Tcb22Commands
@@ -45,6 +46,7 @@ internal class RealAndroidBleBridge(
     private var expectedGear: Int? = null
     private var throttleResponseDeferred: CompletableDeferred<Int>? = null
     private var brakeResponseDeferred: CompletableDeferred<Int>? = null
+    private var nfcStatusDeferred: CompletableDeferred<Boolean>? = null
     private var connectedDeviceId: String? = null
     private var lastScanFingerprint: String? = null
     private var lastHeartbeatRxLogMs: Long = 0L
@@ -147,6 +149,8 @@ internal class RealAndroidBleBridge(
         throttleResponseDeferred = null
         brakeResponseDeferred?.cancel()
         brakeResponseDeferred = null
+        nfcStatusDeferred?.cancel()
+        nfcStatusDeferred = null
         return mapOf("state" to "idle")
     }
 
@@ -252,6 +256,23 @@ internal class RealAndroidBleBridge(
             "throttleResponse" to throttle,
             "brakeResponse" to brake,
         )
+    }
+
+    suspend fun readNfcStatus(timeoutMs: Long): Map<String, Any?> {
+        val deferred = CompletableDeferred<Boolean>()
+        nfcStatusDeferred?.cancel()
+        nfcStatusDeferred = deferred
+        emitLog("control", "readNfcStatus requested timeoutMs=$timeoutMs")
+        connection.send(Tcb03Commands.readNfcStatus())
+
+        val matched = withTimeoutOrNull(timeoutMs) { deferred.await() }
+            ?: throw BridgeNativeException(
+                code = ErrorCodes.TIMEOUT,
+                message = "NFC status read timeout",
+                retriable = true,
+                details = mapOf("timeoutMs" to timeoutMs),
+            )
+        return mapOf("nfcEnabled" to matched)
     }
 
     suspend fun setGear(gear: Int, timeoutMs: Long): Map<String, Any?> {
@@ -378,6 +399,17 @@ internal class RealAndroidBleBridge(
                     )
                 }
                 brakeResponseDeferred = null
+                if (nfcStatusDeferred?.isCompleted == false) {
+                    nfcStatusDeferred?.completeExceptionally(
+                        BridgeNativeException(
+                            code = ErrorCodes.BLE_DISCONNECTED,
+                            message = "Disconnected while waiting NFC status read",
+                            retriable = true,
+                            details = null,
+                        )
+                    )
+                }
+                nfcStatusDeferred = null
                 pendingConnectMac = null
             }
             BleState.Scanning -> emitConnection("scanning", reason = null, retriable = false, device = null)
@@ -465,6 +497,11 @@ internal class RealAndroidBleBridge(
                     }
                     emitTelemetry("responseTuning", mapOf("brake" to brakeValue))
                 }
+            }
+            is TcbResponse.NfcStatusUpdate -> {
+                nfcStatusDeferred?.complete(parsed.enabled)
+                nfcStatusDeferred = null
+                emitTelemetry("nfc", mapOf("enabled" to parsed.enabled))
             }
             null -> Unit
             else -> {

@@ -97,6 +97,11 @@ class ScooterBridgeClient {
     timeoutMs: timeoutMs,
     payload: {'throttle': throttle, 'brake': brake},
   );
+  Future<BridgeResponse> readNfcStatus({int? timeoutMs}) => _invoke(
+    _control,
+    'readNfcStatus',
+    timeoutMs: timeoutMs,
+  );
   Future<BridgeResponse> setGear({required int gear, int? timeoutMs}) => _invoke(
     _control,
     'setGear',

@@ -171,6 +171,7 @@ internal class ScooterMethodHandler(
                 }
                 native.setThrottleBrakeResponse(throttle, brake)
             }
+            "readNfcStatus" -> native.readNfcStatus(timeoutMs)
             "setGear" -> {
                 val gear = when (val value = payload["gear"]) {
                     is Int -> value
