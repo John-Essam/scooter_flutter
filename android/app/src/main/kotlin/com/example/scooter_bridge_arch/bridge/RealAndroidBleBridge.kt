@@ -370,6 +370,21 @@ internal class RealAndroidBleBridge(
         )
     }
 
+    fun setRainbowMode(): Map<String, Any?> {
+        connection.send(
+            Tcb1ACommands.writeAmbientLight(
+                AmbientRgbStatus(
+                    mode = AmbientLightMode.Rainbow,
+                    red = 255,
+                    green = 255,
+                    blue = 255,
+                    brightness = 255,
+                )
+            )
+        )
+        return mapOf("rainbowMode" to true)
+    }
+
     suspend fun setGear(gear: Int, timeoutMs: Long): Map<String, Any?> {
         val resolved = when (gear) {
             0 -> ScooterGear.ZERO

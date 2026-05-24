@@ -139,6 +139,11 @@ class ScooterBridgeClient {
       'brightness': brightness,
     },
   );
+  Future<BridgeResponse> setRainbowMode({int? timeoutMs}) => _invoke(
+    _control,
+    'setRainbowMode',
+    timeoutMs: timeoutMs,
+  );
   Future<BridgeResponse> setGear({required int gear, int? timeoutMs}) => _invoke(
     _control,
     'setGear',

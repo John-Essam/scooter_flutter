@@ -251,6 +251,7 @@ internal class ScooterMethodHandler(
                 }
                 native.setAmbientRgb(mode, red, green, blue, brightness)
             }
+            "setRainbowMode" -> native.setRainbowMode()
             "setGear" -> {
                 val gear = when (val value = payload["gear"]) {
                     is Int -> value
