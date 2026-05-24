@@ -98,6 +98,11 @@ class ScooterBridgeClient {
     'readControllerTemperature',
     timeoutMs: timeoutMs,
   );
+  Future<BridgeResponse> readBatteryTemperature({int? timeoutMs}) => _invoke(
+    _control,
+    'readBatteryTemperature',
+    timeoutMs: timeoutMs,
+  );
   Future<BridgeResponse> setThrottleBrakeResponse({
     required int throttle,
     required int brake,

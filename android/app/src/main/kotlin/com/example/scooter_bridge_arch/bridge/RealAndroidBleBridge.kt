@@ -413,6 +413,27 @@ internal class RealAndroidBleBridge(
         )
     }
 
+    suspend fun readBatteryTemperature(timeoutMs: Long): Map<String, Any?> {
+        val deferred = CompletableDeferred<Int>()
+        temperatureDeferred?.cancel()
+        temperatureDeferred = deferred
+        expectedTemperatureType = TempType.Battery
+        emitLog("control", "readBatteryTemperature requested timeoutMs=$timeoutMs")
+        connection.send(Tcb0ACommands.readBatteryTemp())
+
+        val matched = withTimeoutOrNull(timeoutMs) { deferred.await() }
+            ?: throw BridgeNativeException(
+                code = ErrorCodes.TIMEOUT,
+                message = "Battery temperature read timeout",
+                retriable = true,
+                details = mapOf("timeoutMs" to timeoutMs),
+            )
+        return mapOf(
+            "batteryTemperatureC" to matched,
+            "type" to "battery",
+        )
+    }
+
     suspend fun setGear(gear: Int, timeoutMs: Long): Map<String, Any?> {
         val resolved = when (gear) {
             0 -> ScooterGear.ZERO
