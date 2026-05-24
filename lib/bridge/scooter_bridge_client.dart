@@ -177,6 +177,11 @@ class ScooterBridgeClient {
     timeoutMs: timeoutMs,
     payload: {'enabled': enabled},
   );
+  Future<BridgeResponse> factoryReset({int? timeoutMs}) => _invoke(
+    _control,
+    'factoryReset',
+    timeoutMs: timeoutMs,
+  );
   Future<BridgeResponse> setAmbientLight({
     required bool on,
     int? timeoutMs,

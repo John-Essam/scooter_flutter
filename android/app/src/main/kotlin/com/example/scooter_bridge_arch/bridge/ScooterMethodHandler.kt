@@ -194,6 +194,7 @@ internal class ScooterMethodHandler(
                     )
                 native.setNfcEnabled(enabled, timeoutMs)
             }
+            "factoryReset" -> native.factoryReset()
             "setAmbientLight" -> {
                 val on = payload["on"] as? Boolean
                     ?: throw BridgeNativeException(

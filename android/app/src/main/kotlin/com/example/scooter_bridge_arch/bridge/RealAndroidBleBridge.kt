@@ -28,6 +28,7 @@ import com.example.scooter_android_demo.model.enums.DeviceModel
 import com.example.scooter_android_demo.model.enums.TempType
 import com.example.scooter_android_demo.protocol.TcbResponse
 import com.example.scooter_android_demo.protocol.TcbResponseParser
+import com.example.scooter_android_demo.protocol.TcbAddress
 import com.example.scooter_android_demo.protocol.TcbManualFrame
 import com.example.tcblecomminucation.TCBConstant.TCBResponseType
 import com.example.tcblecomminucation.cmd.TCB03CMD
@@ -344,6 +345,18 @@ internal class RealAndroidBleBridge(
                 details = mapOf("enabled" to enabled, "timeoutMs" to timeoutMs),
             )
         return mapOf("nfcEnabled" to matched)
+    }
+
+    fun factoryReset(): Map<String, Any?> {
+        emitLog("control", "factoryReset requested")
+        connection.send(
+            TcbManualFrame.write(
+                functionCode = 0x03,
+                payload = byteArrayOf(0x02, 0x02),
+                address = TcbAddress.CONTROLLER_WRITE,
+            )
+        )
+        return mapOf("factoryResetRequested" to true)
     }
 
     suspend fun setAmbientLight(on: Boolean, timeoutMs: Long): Map<String, Any?> {
