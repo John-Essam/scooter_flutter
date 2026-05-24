@@ -128,6 +128,11 @@ class ScooterBridgeClient {
     'readOdo',
     timeoutMs: timeoutMs,
   );
+  Future<BridgeResponse> readSpeedStats({int? timeoutMs}) => _invoke(
+    _control,
+    'readSpeedStats',
+    timeoutMs: timeoutMs,
+  );
   Future<BridgeResponse> setThrottleBrakeResponse({
     required int throttle,
     required int brake,
