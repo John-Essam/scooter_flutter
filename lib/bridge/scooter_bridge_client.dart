@@ -24,6 +24,9 @@ class ScooterBridgeClient {
   Stream<Map<String, dynamic>> faultFlagsStream() => telemetryStream()
       .where((event) => _faultDataFromEvent(event) != null)
       .map((event) => _faultDataFromEvent(event)!);
+  Stream<Map<String, dynamic>> operationalStatusStream() => telemetryStream()
+      .where((event) => _operationalDataFromEvent(event) != null)
+      .map((event) => _operationalDataFromEvent(event)!);
   Stream<Map<String, dynamic>> connectionStateStream() =>
       _mapEvent(_connectionState);
   Stream<Map<String, dynamic>> logsStream() => _mapEvent(_logs);
@@ -223,6 +226,30 @@ class ScooterBridgeClient {
       final faults = (normalized['faults'] as Map)
           .map((key, value) => MapEntry(key.toString(), value));
       return faults;
+    }
+    return null;
+  }
+
+  Map<String, dynamic>? _operationalDataFromEvent(Map<String, dynamic> event) {
+    final type = event['type']?.toString();
+    final data = event['data'];
+    if (data is! Map) return null;
+    final normalized = data.map((key, value) => MapEntry(key.toString(), value));
+    if (type == 'operationalStatus') return normalized;
+    if (type == 'heartbeat') {
+      return {
+        'lockStatus': normalized['lockStatus'],
+        'headlightOn': normalized['headlightOn'],
+        'cruiseEnabled': normalized['cruiseEnabled'],
+        'cruiseActive': normalized['cruiseActive'],
+        'startMode': normalized['startMode'],
+        'gear': normalized['gear'],
+        'metricUnit': normalized['metricUnit'],
+        'charging': normalized['charging'],
+        'motorRunning': normalized['motorRunning'],
+        'electronicBrake': normalized['electronicBrake'],
+        'mechanicalBrake': normalized['mechanicalBrake'],
+      };
     }
     return null;
   }

@@ -584,6 +584,7 @@ internal class RealAndroidBleBridge(
                 latestHeartbeat = parsed.value
                 emitTelemetry("heartbeat", heartbeatMap(parsed.value))
                 emitTelemetry("faultFlags", faultMap(parsed.value))
+                emitTelemetry("operationalStatus", operationalStatusMap(parsed.value))
                 val expected = expectedLockState
                 if (expected != null && parsed.value.locked == expected) {
                     expectedLockState = null
@@ -690,6 +691,16 @@ internal class RealAndroidBleBridge(
             "batteryOvervoltage" to hb.faults.batteryOvervoltage,
             "batteryTemperatureHigh" to hb.faults.batteryTemperatureHigh,
             "controllerTemperatureProtection" to hb.faults.controllerTemperatureProtection,
+        )
+
+    private fun operationalStatusMap(hb: Heartbeat): Map<String, Any?> =
+        mapOf(
+            "lockStatus" to hb.locked,
+            "headlightOn" to hb.headlightOn,
+            "cruiseEnabled" to hb.cruiseOn,
+            "startMode" to hb.startMode,
+            "gear" to hb.gear,
+            "metricUnit" to hb.metricUnit,
         )
 
     private fun emitConnection(
